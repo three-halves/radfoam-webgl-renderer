@@ -1,0 +1,15 @@
+{
+  "type": "module",
+  "scripts": {
+    "build": "webpack"
+  },
+  "dependencies": {
+    "@loaders.gl/core": "^4.3.4",
+    "@loaders.gl/ply": "^4.3.4",
+    "@loaders.gl/polyfills": "^4.3.4"
+  },
+  "devDependencies": {
+    "webpack": "^5.103.0",
+    "webpack-cli": "^6.0.1"
+  }
+}
