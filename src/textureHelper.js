@@ -64,11 +64,11 @@ function formatPLYData(plyData, adjData)
     
     // adjacencyIndices must be a Float32Array for compatibility with R32F texture format
     const adjacencyIndicesFloat = new Float32Array(adjIndices.buffer);
-    console.log(new Uint32Array(adjIndices));
+    console.log(new Uint32Array(adjOffsets.buffer));
     return {
         cellPositions: cellPositionsF32,
         cellAttributes: cellAttributes,
-        cellOffsets: new Float32Array(adjOffsets.buffer),
+        cellOffsets: new Uint32Array(adjOffsets.buffer),
         adjacencyIndices: adjacencyIndicesFloat,
         adjacencyDiffs: new Float32Array(adjacencyDiffs)
     };
@@ -151,8 +151,8 @@ export function createVolumeTextures(gl, plyData, adjData) {
 
     textureHandles.offsets_tex = createTexture(
         cellOffsets,
-        BUFFER_WIDTH, POS_ATTR_HEIGHT / 4,
-        gl.R32F, gl.RED, gl.FLOAT, 1
+        BUFFER_WIDTH, POS_ATTR_HEIGHT,
+        gl.R32UI, gl.RED_INTEGER, gl.UNSIGNED_INT, 1
     );
 
     return textureHandles;

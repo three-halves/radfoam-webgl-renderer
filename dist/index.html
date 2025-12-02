@@ -25,7 +25,7 @@ uniform sampler2D _attr_tex;
 uniform sampler2D _positions_tex;
 uniform sampler2D _adjacency_diff_tex; 
 uniform sampler2D _adjacency_tex;
-uniform sampler2D _offsets_tex;
+uniform usampler2D _offsets_tex;
 
 // Uniforms for raycasting logic
 uniform float _FisheyeFOV;
@@ -53,10 +53,10 @@ vec2 index_to_tex_buffer(uint i, vec2 texel_size, uint width) {
     return vec2((float(x) + 0.5) * texel_size.x, (float(y) + 0.5) * texel_size.y);
 }
 
-float offset_buff(uint i) {
+uint offset_buff(uint i) {
     // NOTE: Texel width is 1 since this is R32UI.
     vec2 uv = index_to_tex_buffer(i, _offsets_tex_TexelSize, BUFFER_WIDTH);
-    return textureLod(_offsets_tex, uv, 0.0).r;
+    return texture(_offsets_tex, uv).r;
 }
 
 vec3 positions_buff(uint i) {
@@ -130,9 +130,9 @@ void main()
         vec3 cell_data = positions_buff(cell);
 
         // Previously read from cell_data.w, now seperate buffer
-        uint adj_from = (cell > 0u) ? floatBitsToUint(offset_buff(cell - 1u)) : 0u;
+        uint adj_from = (cell > 0u) ? (offset_buff(cell - 1u)) : 0u;
 
-        uint adj_to = floatBitsToUint(offset_buff(cell));
+        uint adj_to = (offset_buff(cell));
         
         vec4 attrs = attrs_buff(cell);
 
@@ -142,13 +142,10 @@ void main()
         uint faces = adj_to - adj_from;
 
         // Testing tracing without crashing webgl
-        if (faces > 100000u) {
+        if (faces == 0u) {
             fragColor = vec4(0.0, 1.0, 0.0, 1.0); 
             return; 
         }
-
-        fragColor = vec4(0.0, 0.0, 1.0, 1.0);
-        return;
 
         for (uint f = 0u; f < faces; f += CHUNK_SIZE) {
 
