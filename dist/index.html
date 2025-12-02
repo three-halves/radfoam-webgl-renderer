@@ -25,7 +25,7 @@ uniform sampler2D _attr_tex;
 uniform sampler2D _positions_tex;
 uniform sampler2D _adjacency_diff_tex; 
 uniform sampler2D _adjacency_tex;
-uniform sampler2D _offsets_tex;
+uniform usampler2D _offsets_tex;
 
 // Uniforms for raycasting logic
 uniform float _FisheyeFOV;
@@ -53,15 +53,15 @@ vec2 index_to_tex_buffer(uint i, vec2 texel_size, uint width) {
     return vec2((float(x) + 0.5) * texel_size.x, (float(y) + 0.5) * texel_size.y);
 }
 
-float offset_buff(uint i) {
+uint offset_buff(uint i) {
     // NOTE: Texel width is 1 since this is R32UI.
     vec2 uv = index_to_tex_buffer(i, _offsets_tex_TexelSize, BUFFER_WIDTH);
-    return textureLod(_offsets_tex, uv, 0.0).r;
+    return texture(_offsets_tex, uv).r;
 }
 
-vec3 positions_buff(uint i) {
+vec4 positions_buff(uint i) {
     vec2 uv = index_to_tex_buffer(i, _positions_tex_TexelSize, BUFFER_WIDTH);
-    return textureLod(_positions_tex, uv, 0.0).xyz; 
+    return textureLod(_positions_tex, uv, 0.0); 
 }
 
 vec4 attrs_buff(uint i) {
@@ -127,12 +127,14 @@ void main()
     int i = 0;
     // Loop max 200 iterations or until transmittance is too low
     for (i = 0; i < 200 && transmittance > 0.05; i++) {
-        vec3 cell_data = positions_buff(cell);
+        vec4 cell_data = positions_buff(cell);
 
         // Previously read from cell_data.w, now seperate buffer
-        uint adj_from = (cell > 0u) ? floatBitsToUint(offset_buff(cell - 1u)) : 0u;
-
-        uint adj_to = floatBitsToUint(offset_buff(cell));
+        uint adj_from = (cell > 0u) ? floatBitsToUint(positions_buff(cell - 1u).w) : 0u;
+        // uint adj_from = (cell > 0u) ? (offset_buff(cell - 1u)) : 0u;
+        
+        uint adj_to = floatBitsToUint(cell_data.w);
+        // uint adj_to = (offset_buff(cell));
         
         vec4 attrs = attrs_buff(cell);
 
@@ -140,15 +142,6 @@ void main()
         uint next_face = INVALID_FACE;
 
         uint faces = adj_to - adj_from;
-
-        // Testing tracing without crashing webgl
-        if (faces > 100000u) {
-            fragColor = vec4(0.0, 1.0, 0.0, 1.0); 
-            return; 
-        }
-
-        fragColor = vec4(0.0, 0.0, 1.0, 1.0);
-        return;
 
         for (uint f = 0u; f < faces; f += CHUNK_SIZE) {
 
@@ -223,7 +216,11 @@ void main()
 
     <h1 id="loading-msg">PLY file is loading...</h1>
     <canvas id="gl-canvas" width="480" height="270"></canvas>
+    <input type="range" id="z-slider" min="-100" max="100" value="-50" step="1" />
+
+
     <script src="webgl-utils.js"></script>
     <script src="main.js" type="text/javascript"></script>
+
   </body>
 </html>

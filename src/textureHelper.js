@@ -26,16 +26,14 @@ function formatPLYData(plyData, adjData)
         cellPositionsF32[i * 4 + 0] = Pix;
         cellPositionsF32[i * 4 + 1] = Piy;
         cellPositionsF32[i * 4 + 2] = Piz;
-        cellPositionsU32[i * 4 + 3] = 0;
-        // cellPositionsU32[i * 4 + 3] = adjOffsets[i]; 
+        // cellPositionsU32[i * 4 + 3] = 0;
+        cellPositionsU32[i * 4 + 3] = adjOffsets[i]; 
 
-        //         if (i < 5) {
-        //     console.log(`Cell ${i}: Source Offset (Uint) = ${adjOffsets[i]}`);
-
-        //     console.log(`Cell ${i}: Packed Float Value = ${cellPositionsF32[i * 4 + 3]}`);
-
-        //     console.log(`Cell ${i}: Unpacked Uint Value = ${cellPositionsU32[i * 4 + 3]}`);
-        // }
+        if (i < 5) {
+            console.log(`Cell ${i}: Source Offset (Uint) = ${adjOffsets[i]}`);
+            console.log(`Cell ${i}: Packed Float Value = ${cellPositionsF32[i * 4 + 3]}`);
+            console.log(`Cell ${i}: Unpacked Uint Value = ${cellPositionsU32[i * 4 + 3]}`);
+        }
 
         cellAttributes[i * 4 + 0] = srcColors[i * 3] / 255.0;
         cellAttributes[i * 4 + 1] = srcColors[i * 3 + 1] / 255.0;
@@ -66,9 +64,8 @@ function formatPLYData(plyData, adjData)
     const adjacencyIndicesFloat = new Float32Array(adjIndices.buffer);
     console.log(new Uint32Array(adjIndices));
     return {
-        cellPositions: cellPositionsF32,
+        cellPositions: new Float32Array(cellPositionsF32.buffer),
         cellAttributes: cellAttributes,
-        cellOffsets: new Float32Array(adjOffsets.buffer),
         adjacencyIndices: adjacencyIndicesFloat,
         adjacencyDiffs: new Float32Array(adjacencyDiffs)
     };
@@ -81,7 +78,6 @@ export function createVolumeTextures(gl, plyData, adjData) {
     const { 
         cellPositions,    // float4: x, y, z, adj_end_index (packed)
         cellAttributes,   // float4: r, g, b, density (packed)
-        cellOffsets,
         adjacencyIndices, // uint: next_cell_index
         adjacencyDiffs    // float3: face_midpoint_normal_diff
     } = formatPLYData(plyData, adjData); 
@@ -129,7 +125,7 @@ export function createVolumeTextures(gl, plyData, adjData) {
 
     textureHandles.positions_tex = createTexture(
         cellPositions,
-        BUFFER_WIDTH, POS_ATTR_HEIGHT, gl.RGB32F, gl.RGB, gl.FLOAT, 4
+        BUFFER_WIDTH, POS_ATTR_HEIGHT, gl.RGBA32F, gl.RGBA, gl.FLOAT, 4
     );
 
     textureHandles.attr_tex = createTexture(
@@ -147,12 +143,6 @@ export function createVolumeTextures(gl, plyData, adjData) {
         adjacencyDiffs,
         BUFFER_WIDTH, ADJ_HEIGHT,
         gl.RGB32F, gl.RGB, gl.FLOAT, 3
-    );
-
-    textureHandles.offsets_tex = createTexture(
-        cellOffsets,
-        BUFFER_WIDTH, POS_ATTR_HEIGHT / 4,
-        gl.R32F, gl.RED, gl.FLOAT, 1
     );
 
     return textureHandles;

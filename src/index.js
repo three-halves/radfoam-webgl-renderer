@@ -17,12 +17,31 @@ var quadDrawCount = 6;
 var plyData = null;
 var adjData = null;
 
+// camera data
+var camera = {
+    x: 0,
+    y: 0,
+    z: -50,
+}
+
+// camera controls
+document.getElementById("z-slider").addEventListener("input", (event) => {
+    camera.z = parseFloat(event.target.value);
+    SHADER_UNIFORMS.Camera2WorldMatrix.set([
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, camera.z, 1
+    ]
+    );
+});
+
 const SHADER_UNIFORMS = {
     Camera2WorldMatrix: new Float32Array([
       1, 0, 0, 0,
       0, 1, 0, 0,
       0, 0, 1, 0,
-      0, 0, -50, 1
+      0, 0, camera.z, 1
     ]),
     InverseProjectionMatrix: new Float32Array(16),
     unity_ObjectToClipPos: new Float32Array([
@@ -39,7 +58,6 @@ const SHADER_UNIFORMS = {
     ScreenParams: new Float32Array(4),
     positions_tex_TexelSize: new Float32Array(2),
     adjacency_tex_TexelSize: new Float32Array(2),
-    offsets_tex_TexelSize: new Float32Array(2),
 };
 
 const TEXTURE_UNITS = {
@@ -48,7 +66,6 @@ const TEXTURE_UNITS = {
     positions_tex: 2,
     adjacency_diff_tex: 3,
     adjacency_tex: 4,
-    offsets_tex: 5,
 };
 var textureHandles = {}; // WebGL Texture objects
 
@@ -60,9 +77,10 @@ async function parsePLY()
     const result = await load(filePath, PLYLoader);
     console.log(result);
     console.log("End parse PLY file");
-    result.attributes.POSITION.value = result.attributes.POSITION.value.slice(0, 50000);
+    // result.attributes.POSITION.value = result.attributes.POSITION.value.slice(0, 50000);
     plyData = result;
-    adjData = (await loadAdjacencyBinary(filePath)).slice(0, 1000000);
+    adjData = (await loadAdjacencyBinary(filePath))
+    // adjData = (await loadAdjacencyBinary(filePath)).slice(0, 1000000);
 }
 
 // loaders.gl does not support custom properties in PLY, so we manually extract adjacency indices from the binary file :(
@@ -103,7 +121,6 @@ function initWebGL()
 
     gl.clearColor(0.6, 0.3, 0.3, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
-
     const w = gl.canvas.width;
     const h = gl.canvas.height;
     SHADER_UNIFORMS.ScreenParams.set([1.0 / w, 1.0 / h, w, h]);
@@ -111,12 +128,11 @@ function initWebGL()
     const BUF_W = 4096.0;
     console.log(Math.ceil(adjData.length / BUF_W));
     console.log(Math.ceil((plyData.attributes.POSITION.value.length / 3) / BUF_W));
-    SHADER_UNIFORMS.positions_tex_TexelSize.set([1.0 / BUF_W, Math.ceil((plyData.attributes.POSITION.value.length / 3) / BUF_W)]);
-    SHADER_UNIFORMS.adjacency_tex_TexelSize.set([1.0 / BUF_W, Math.ceil(adjData.length / BUF_W)]);
-    SHADER_UNIFORMS.offsets_tex_TexelSize.set([1.0 / BUF_W, Math.ceil((plyData.attributes.POSITION.value.length / 3) / BUF_W)]);
+    // SHADER_UNIFORMS.positions_tex_TexelSize.set([1.0 / BUF_W, Math.ceil((plyData.attributes.POSITION.value.length / 3) / BUF_W)]);
+    // SHADER_UNIFORMS.adjacency_tex_TexelSize.set([1.0 / BUF_W, Math.ceil(adjData.length / BUF_W)]);
 
-    // SHADER_UNIFORMS.positions_tex_TexelSize.set([1.0 / BUF_W, 1.0 / BUF_W]);
-    // SHADER_UNIFORMS.adjacency_tex_TexelSize.set([1.0 / BUF_W, 1.0 / BUF_W]);
+    SHADER_UNIFORMS.positions_tex_TexelSize.set([1.0 / BUF_W, 1.0 / BUF_W]);
+    SHADER_UNIFORMS.adjacency_tex_TexelSize.set([1.0 / BUF_W, 1.0 / BUF_W]);
 }
 
 function initShaders()
@@ -125,7 +141,8 @@ function initShaders()
         gl, ["shader-vs","shader-fs"]
     );
     gl.useProgram(program);
-
+    console.log(gl.getParameter(gl.COMPRESSED_TEXTURE_FORMATS));
+    console.log(gl.getParameter(gl.MAX_TEXTURE_SIZE));
     // Get all shader uniform locations
     uniformLocations.unity_ObjectToClipPos = gl.getUniformLocation(program, 'unity_ObjectToClipPos');
     uniformLocations.Camera2WorldMatrix = gl.getUniformLocation(program, '_Camera2WorldMatrix');
@@ -135,14 +152,12 @@ function initShaders()
     uniformLocations.ScreenParams = gl.getUniformLocation(program, 'u_ScreenParams'); // used in vert
     uniformLocations.positions_tex_TexelSize = gl.getUniformLocation(program, '_positions_tex_TexelSize');
     uniformLocations.adjacency_tex_TexelSize = gl.getUniformLocation(program, '_adjacency_tex_TexelSize');
-    uniformLocations.offsets_tex_TexelSize = gl.getUniformLocation(program, '_offsets_tex_TexelSize');
 
     uniformLocations.MainTex = gl.getUniformLocation(program, '_MainTex');
     uniformLocations.attr_tex = gl.getUniformLocation(program, '_attr_tex');
     uniformLocations.positions_tex = gl.getUniformLocation(program, '_positions_tex');
     uniformLocations.adjacency_diff_tex = gl.getUniformLocation(program, '_adjacency_diff_tex');
     uniformLocations.adjacency_tex = gl.getUniformLocation(program, '_adjacency_tex');
-    uniformLocations.offsets_tex = gl.getUniformLocation(program, '_offsets_tex');
 
     console.log("Shaders init done");
 }
@@ -193,7 +208,6 @@ function findClosestPointIndex(x, y, z, positions)
       closestIndex = i;
     }
   }
-
   return closestIndex;
 }
 
@@ -214,12 +228,13 @@ function setAttributes()
 
 function setUniforms(gl, program)
 {
+    // gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+
     gl.uniform1i(uniformLocations.MainTex, TEXTURE_UNITS.MainTex);
     gl.uniform1i(uniformLocations.attr_tex, TEXTURE_UNITS.attr_tex);
     gl.uniform1i(uniformLocations.positions_tex, TEXTURE_UNITS.positions_tex);
     gl.uniform1i(uniformLocations.adjacency_diff_tex, TEXTURE_UNITS.adjacency_diff_tex);
     gl.uniform1i(uniformLocations.adjacency_tex, TEXTURE_UNITS.adjacency_tex);
-    gl.uniform1i(uniformLocations.offsets_tex, TEXTURE_UNITS.offsets_tex);
 
     gl.uniformMatrix4fv(uniformLocations.unity_ObjectToClipPos, false, SHADER_UNIFORMS.unity_ObjectToClipPos);
     gl.uniformMatrix4fv(uniformLocations.Camera2WorldMatrix, false, SHADER_UNIFORMS.Camera2WorldMatrix);
@@ -230,7 +245,6 @@ function setUniforms(gl, program)
     gl.uniform4fv(uniformLocations.ScreenParams, SHADER_UNIFORMS.ScreenParams);
     gl.uniform2fv(uniformLocations.positions_tex_TexelSize, SHADER_UNIFORMS.positions_tex_TexelSize);
     gl.uniform2fv(uniformLocations.adjacency_tex_TexelSize, SHADER_UNIFORMS.adjacency_tex_TexelSize);
-    gl.uniform2fv(uniformLocations.offsets_tex_TexelSize, SHADER_UNIFORMS.positions_tex_TexelSize);
     
     // Bind Textures
     gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.MainTex);
@@ -247,9 +261,6 @@ function setUniforms(gl, program)
 
     gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.adjacency_tex);
     gl.bindTexture(gl.TEXTURE_2D, textureHandles.adjacency_tex || null);
-
-    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.offsets_tex);
-    gl.bindTexture(gl.TEXTURE_2D, textureHandles.offsets_tex || null);
 }
 
 function drawScene() {
@@ -271,7 +282,6 @@ function drawScene() {
 
 function main()
 {
-
     parsePLY().then(() => {
         document.getElementById("loading-msg").hidden = true;
         initWebGL();
