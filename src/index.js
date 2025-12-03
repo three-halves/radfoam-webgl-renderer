@@ -6,7 +6,7 @@ import { dist3 } from './utils.js';
 
 // Globals
 // Can be used with other radfoam PLY files that have adjacency data
-const filePath = '../bonsai/scene.ply';
+const filePath = '../data/scene.ply';
 
 var gl = null;
 var program = null;
@@ -113,11 +113,11 @@ async function loadAdjacencyBinary(filePath) {
     const rawBuffer = await response.arrayBuffer();
     
     // Extract Adjacency Indices
-    const adjBlockStart = 1968522 * 203 + plyData.loaderData.headerLength;
+    const adjBlockStart = plyData.header.vertexCount * 203 + plyData.loaderData.headerLength;
     
     const adjBufferSlice = rawBuffer.slice(
         adjBlockStart, 
-        adjBlockStart + (30268338 * 4)
+        adjBlockStart + (plyData.loaderData.elements[1].count * 4)
     );
     
     const finalAdjacencyIndices = new Uint32Array(adjBufferSlice);
