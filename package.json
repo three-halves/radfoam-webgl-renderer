@@ -1,12 +1,14 @@
 {
   "type": "module",
   "scripts": {
+    "start": "npm install && webpack && http-server",
     "build": "webpack"
   },
   "dependencies": {
     "@loaders.gl/core": "^4.3.4",
     "@loaders.gl/ply": "^4.3.4",
-    "@loaders.gl/polyfills": "^4.3.4"
+    "@loaders.gl/polyfills": "^4.3.4",
+    "http-server": "^14.1.1"
   },
   "devDependencies": {
     "webpack": "^5.103.0",

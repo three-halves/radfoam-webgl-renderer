@@ -5,6 +5,9 @@ import {createVolumeTextures } from './textureHelper.js';
 import { dist3 } from './utils.js';
 
 // Globals
+// Can be used with other radfoam PLY files that have adjacency data
+const filePath = '../bonsai/scene.ply';
+
 var gl = null;
 var program = null;
 
@@ -25,16 +28,32 @@ var camera = {
 }
 
 // camera controls
-document.getElementById("z-slider").addEventListener("input", (event) => {
+document.getElementById("z-slider").addEventListener("change", (event) => {
     camera.z = parseFloat(event.target.value);
+    updateCameraTransform();
+    console.log(`Camera Z: ${camera.z}`);
+});
+
+document.getElementById("y-slider").addEventListener("change", (event) => {
+    camera.y = parseFloat(event.target.value);
+    updateCameraTransform();
+});
+
+document.getElementById("x-slider").addEventListener("change", (event) => {
+    camera.x = parseFloat(event.target.value);
+    updateCameraTransform();
+});
+
+function updateCameraTransform()
+{
     SHADER_UNIFORMS.Camera2WorldMatrix.set([
         1, 0, 0, 0,
         0, 1, 0, 0,
         0, 0, 1, 0,
-        0, 0, camera.z, 1
+        camera.x, camera.y, camera.z, 1
     ]
     );
-});
+}
 
 const SHADER_UNIFORMS = {
     Camera2WorldMatrix: new Float32Array([
@@ -72,7 +91,6 @@ var textureHandles = {}; // WebGL Texture objects
 async function parsePLY()
 {
     console.log("Begin parse PLY file");
-    const filePath = '../bonsai/scene.ply';
 
     const result = await load(filePath, PLYLoader);
     console.log(result);
@@ -128,13 +146,17 @@ function initWebGL()
     const BUF_W = 4096.0;
     console.log(Math.ceil(adjData.length / BUF_W));
     console.log(Math.ceil((plyData.attributes.POSITION.value.length / 3) / BUF_W));
-    // SHADER_UNIFORMS.positions_tex_TexelSize.set([1.0 / BUF_W, Math.ceil((plyData.attributes.POSITION.value.length / 3) / BUF_W)]);
-    // SHADER_UNIFORMS.adjacency_tex_TexelSize.set([1.0 / BUF_W, Math.ceil(adjData.length / BUF_W)]);
 
     SHADER_UNIFORMS.positions_tex_TexelSize.set([1.0 / BUF_W, 1.0 / BUF_W]);
     SHADER_UNIFORMS.adjacency_tex_TexelSize.set([1.0 / BUF_W, 1.0 / BUF_W]);
+
+    // PROBLEM: Setting the texel size to the appropriate height, as commented below, causes memory overflow issues in WebGL.
+    // Some sort of texture tiling system or storage is needed to fix.
+    // SHADER_UNIFORMS.positions_tex_TexelSize.set([1.0 / BUF_W, Math.ceil((plyData.attributes.POSITION.value.length / 3) / BUF_W)]);
+    // SHADER_UNIFORMS.adjacency_tex_TexelSize.set([1.0 / BUF_W, Math.ceil(adjData.length / BUF_W)]);
 }
 
+// Bind frag/vert shaders in index.html to webgl program and set uniforms
 function initShaders()
 {
     program = webglUtils.createProgramFromScripts(
