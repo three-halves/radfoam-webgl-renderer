@@ -100,7 +100,7 @@ const SHADER_UNIFORMS = {
         0, 0, 0, 1
     ]),
     
-    FisheyeFOV: 60.0,
+    FisheyeFOV: 30.0,
     
     start_index: 0,
   
