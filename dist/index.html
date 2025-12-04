@@ -92,10 +92,10 @@ void GetCameraRayFisheye(vec2 uv, float fov, out vec3 ray_origin, out vec3 ray_d
     ray_origin = (_Camera2WorldMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 
     float theta = atan(uv.y, uv.x); // atan2 in HLSL is typically atan(y, x) in GLSL for vectors
-    float phi = sqrt(dot(uv, uv)) * fov * (1.0 / 360.0) * 2.0 * PI;
+    float phi = sqrt(dot(uv, uv)) * fov * (1.0 / 360.0) * PI;
 
     vec3 local_dir = sin(phi) * cos(theta) * vec3(1.0, 0.0, 0.0)
-                   + sin(phi) * sin(theta) * vec3(0.0, 1.0, 0.0)
+                   + sin(phi) * sin(theta) * vec3(0.0, -1.0, 0.0)
                    + cos(phi) * vec3(0.0, 0.0, 1.0);
 
     ray_direction = (_Camera2WorldMatrix * vec4(local_dir, 0.0)).xyz;
@@ -260,6 +260,21 @@ void main()
         <label for="z-slider">
             Z Pos:
         <input type="range" id="z-slider" min="-100" max="100" value="-50" step="1" />
+        </label>
+
+        <label for="x-rot-slider">
+            Pitch:
+        <input type="range" id="x-rot-slider" min="-180" max="180" value="0" step="1" />
+        </label>
+
+        <label for="y-rot-slider">
+            Yaw:
+        <input type="range" id="y-rot-slider" min="-180" max="180" value="0" step="1" />
+        </label>
+
+        <label for="z-rot-slider">
+            Roll:
+        <input type="range" id="z-rot-slider" min="-180" max="180" value="0" step="1" />
         </label>
     </div>
 

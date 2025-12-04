@@ -2,7 +2,8 @@ import {load} from '@loaders.gl/core';
 import {PLYLoader} from '@loaders.gl/ply';
 import '@loaders.gl/polyfills';
 import {createVolumeTextures } from './textureHelper.js';
-import { dist3 } from './utils.js';
+// TODO: Modulize/Namespace this
+import {dist3, toRadians, multiply4x4, rotationX, rotationY, rotationZ, translation} from './utils.js';
 
 // Globals
 // Can be used with other radfoam PLY files that have adjacency data
@@ -25,34 +26,63 @@ var camera = {
     x: 0,
     y: 0,
     z: -50,
+    rotX: 0,
+    rotY: 0,
+    rotZ: 0
 }
 
 // camera controls
-document.getElementById("z-slider").addEventListener("change", (event) => {
+document.getElementById("z-slider").addEventListener("input", (event) => {
     camera.z = parseFloat(event.target.value);
     updateCameraTransform();
-    console.log(`Camera Z: ${camera.z}`);
+    // console.log(`Camera Z: ${camera.z}`);
 });
 
-document.getElementById("y-slider").addEventListener("change", (event) => {
+document.getElementById("y-slider").addEventListener("input", (event) => {
     camera.y = parseFloat(event.target.value);
     updateCameraTransform();
 });
 
-document.getElementById("x-slider").addEventListener("change", (event) => {
+document.getElementById("x-slider").addEventListener("input", (event) => {
     camera.x = parseFloat(event.target.value);
+    updateCameraTransform();
+});
+
+document.getElementById("x-rot-slider").addEventListener("input", (event) => {
+    camera.rotX = parseFloat(event.target.value);
+    updateCameraTransform();
+});
+
+document.getElementById("y-rot-slider").addEventListener("input", (event) => {
+    camera.rotY = parseFloat(event.target.value);
+    updateCameraTransform();
+});
+
+document.getElementById("z-rot-slider").addEventListener("input", (event) => {
+    camera.rotZ = parseFloat(event.target.value);
     updateCameraTransform();
 });
 
 function updateCameraTransform()
 {
-    SHADER_UNIFORMS.Camera2WorldMatrix.set([
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        camera.x, camera.y, camera.z, 1
-    ]
-    );
+    const radX = toRadians(camera.rotX);
+    const radY = toRadians(camera.rotY);
+    const radZ = toRadians(camera.rotZ);
+
+    const T = translation(camera.x, camera.y, camera.z);
+    const Rx = rotationX(radX);
+    const Ry = rotationY(radY);
+    const Rz = rotationZ(radZ);
+
+    const tempMatrix = new Float32Array(16);
+    
+    // Rotations: R = Rz * Ry * Rx
+    multiply4x4(tempMatrix, Rz, Ry);   // temp = Rz * Ry
+    const R = new Float32Array(16);
+    multiply4x4(R, tempMatrix, Rx);    // R = temp * Rx
+    
+    // Camera2World = R * T
+    multiply4x4(SHADER_UNIFORMS.Camera2WorldMatrix, T, R);
 }
 
 const SHADER_UNIFORMS = {
@@ -262,7 +292,7 @@ function setUniforms(gl, program)
     gl.uniform1f(uniformLocations.FisheyeFOV, SHADER_UNIFORMS.FisheyeFOV);
     // gl.uniform1ui(uniformLocations.start_index, SHADER_UNIFORMS.start_index);
     gl.uniform1ui(uniformLocations._start_index, 
-        findClosestPointIndex(camera.x, camera.y, camera.z, plyData.attributes.POSITION.value)
+        findClosestPointIndex(0, 0, 0, plyData.attributes.POSITION.value)
     );
     gl.uniform4fv(uniformLocations.ScreenParams, SHADER_UNIFORMS.ScreenParams);
     gl.uniform2fv(uniformLocations.positions_tex_TexelSize, SHADER_UNIFORMS.positions_tex_TexelSize);
