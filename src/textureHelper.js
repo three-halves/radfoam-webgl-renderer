@@ -12,7 +12,6 @@ function formatPLYData(plyData, adjData)
     var cellPositionsF32 = new Float32Array(cellPositions); 
     var cellPositionsU32 = new Uint32Array(cellPositions); 
     var cellAttributes = new Float32Array(vertexCount * 4); 
-    
     var adjacencyDiffs = [];
     
     // Fill Cell Data and Calculate Adjacency Diffs
@@ -29,15 +28,16 @@ function formatPLYData(plyData, adjData)
         // cellPositionsU32[i * 4 + 3] = 0;
         cellPositionsU32[i * 4 + 3] = adjOffsets[i]; 
 
-        if (i < 5) {
-            console.log(`Cell ${i}: Source Offset (Uint) = ${adjOffsets[i]}`);
-            console.log(`Cell ${i}: Packed Float Value = ${cellPositionsF32[i * 4 + 3]}`);
-            console.log(`Cell ${i}: Unpacked Uint Value = ${cellPositionsU32[i * 4 + 3]}`);
-        }
+        // Packing verified to be correct
+        // if (i < 5) {
+        //     console.log(`Cell ${i}: Source Offset (Uint) = ${adjOffsets[i]}`);
+        //     console.log(`Cell ${i}: Packed Float Value = ${cellPositionsF32[i * 4 + 3]}`);
+        //     console.log(`Cell ${i}: Unpacked Uint Value = ${cellPositionsU32[i * 4 + 3]}`);
+        // }
 
         cellAttributes[i * 4 + 0] = srcColors[i * 3] / 255.0;
         cellAttributes[i * 4 + 1] = srcColors[i * 3 + 1] / 255.0;
-        cellAttributes[i * 3 + 2] = srcColors[i * 3 + 2] / 255.0;
+        cellAttributes[i * 4 + 2] = srcColors[i * 3 + 2] / 255.0;
         cellAttributes[i * 4 + 3] = srcDensity[i];
         
         const adj_start = (i === 0) ? 0 : adjOffsets[i - 1];
@@ -62,7 +62,7 @@ function formatPLYData(plyData, adjData)
     
     // adjacencyIndices must be a Float32Array for compatibility with R32F texture format
     const adjacencyIndicesFloat = new Float32Array(adjIndices.buffer);
-    console.log(new Uint32Array(adjIndices));
+    console.log(cellPositionsF32);
     return {
         cellPositions: new Float32Array(cellPositionsF32.buffer),
         cellAttributes: cellAttributes,
@@ -100,9 +100,17 @@ export function createVolumeTextures(gl, plyData, adjData) {
         // Pad the array if the data is smaller than the texture container
         if (data.length < requiredSize) {
             console.warn(`Padding texture: Data length ${data.length} -> Required ${requiredSize}`);
-            const padded = new Float32Array(requiredSize);
-            padded.set(data);
-            data = padded; 
+            var padded = null;
+            if (data instanceof Float32Array) {
+                padded = new Float32Array(requiredSize);
+            } else if (data instanceof Float16Array) {
+                padded = new Float16Array(requiredSize);
+            } else if (data instanceof Uint16Array) {
+                padded = new Uint16Array(requiredSize);
+            }
+            padded.set(data);   
+            data = padded;
+            console.log(data);
         }
 
         const texture = gl.createTexture();
@@ -123,6 +131,7 @@ export function createVolumeTextures(gl, plyData, adjData) {
         return texture;
     };
 
+    console.log("Cell Positions", cellPositions, cellPositions[3]);
     textureHandles.positions_tex = createTexture(
         cellPositions,
         BUFFER_WIDTH, POS_ATTR_HEIGHT, gl.RGBA32F, gl.RGBA, gl.FLOAT, 4

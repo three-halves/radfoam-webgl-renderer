@@ -30,7 +30,6 @@ uniform usampler2D _offsets_tex;
 // Uniforms for raycasting logic
 uniform float _FisheyeFOV;
 uniform mat4 _Camera2WorldMatrix;
-uniform mat4 _InverseProjectionMatrix;
 uniform uint _start_index;
 
 // Texel size uniform variables
@@ -50,7 +49,7 @@ const uint INVALID_FACE = 0xFFFFFFFFu;
 vec2 index_to_tex_buffer(uint i, vec2 texel_size, uint width) {
     uint y = i / width;
     uint x = i % width;
-    return vec2((float(x) + 0.5) * texel_size.x, (float(y) + 0.5) * texel_size.y);
+    return vec2((float(x)) * texel_size.x, (float(y)) * texel_size.y);
 }
 
 uint offset_buff(uint i) {
@@ -60,24 +59,32 @@ uint offset_buff(uint i) {
 }
 
 vec4 positions_buff(uint i) {
-    vec2 uv = index_to_tex_buffer(i, _positions_tex_TexelSize, BUFFER_WIDTH);
-    return textureLod(_positions_tex, uv, 0.0); 
+    int w = int(BUFFER_WIDTH);
+    ivec2 coord = ivec2(int(i) % w, int(i) / w);
+    return texelFetch(_positions_tex, coord, 0); 
 }
 
 vec4 attrs_buff(uint i) {
-    vec2 uv = index_to_tex_buffer(i, _positions_tex_TexelSize, BUFFER_WIDTH);
-    return textureLod(_attr_tex, uv, 0.0);
+    int w = int(BUFFER_WIDTH);
+    ivec2 coord = ivec2(int(i) % w, int(i) / w);
+    return texelFetch(_attr_tex, coord, 0);
 }
 
 uint adjacency_buffer(uint i) {
-    vec2 uv = index_to_tex_buffer(i, _adjacency_tex_TexelSize, BUFFER_WIDTH);
-    float val = textureLod(_adjacency_tex, uv, 0.0).r;
-    return uint(val + 0.5); // Read float and cast to uint (adding 0.5 for rounding)
+    int w = int(BUFFER_WIDTH);
+    ivec2 coord = ivec2(int(i) % w, int(i) / w);
+    return floatBitsToUint(texelFetch(_adjacency_tex, coord, 0).r);
+    // vec2 uv = index_to_tex_buffer(i, _adjacency_tex_TexelSize, BUFFER_WIDTH);
+    // float val = textureLod(_adjacency_tex, uv, 0.0).r;
+    // return uint(val + 0.5); // Read float and cast to uint (adding 0.5 for rounding)
 }
 
 vec3 adjacency_diff_buffer(uint i) {
-    vec2 uv = index_to_tex_buffer(i, _adjacency_tex_TexelSize, BUFFER_WIDTH);
-    return textureLod(_adjacency_diff_tex, uv, 0.0).rgb;
+    int w = int(BUFFER_WIDTH);
+    ivec2 coord = ivec2(int(i) % w, int(i) / w);
+    return texelFetch(_adjacency_diff_tex, coord, 0).rgb;
+    // vec2 uv = index_to_tex_buffer(i, _adjacency_tex_TexelSize, BUFFER_WIDTH);
+    // return textureLod(_adjacency_diff_tex, uv, 0.0).rgb;
 }
 
 void GetCameraRayFisheye(vec2 uv, float fov, out vec3 ray_origin, out vec3 ray_direction)
@@ -89,7 +96,7 @@ void GetCameraRayFisheye(vec2 uv, float fov, out vec3 ray_origin, out vec3 ray_d
 
     vec3 local_dir = sin(phi) * cos(theta) * vec3(1.0, 0.0, 0.0)
                    + sin(phi) * sin(theta) * vec3(0.0, 1.0, 0.0)
-                   + cos(phi) * vec3(0.0, 0.0, -1.0);
+                   + cos(phi) * vec3(0.0, 0.0, 1.0);
 
     ray_direction = (_Camera2WorldMatrix * vec4(local_dir, 0.0)).xyz;
 
@@ -124,17 +131,20 @@ void main()
     vec3 color = vec3(0.0, 0.0, 0.0);
     float t_0 = 0.0;
 
+    // Sanity check: if first cell w value is 12, as printed by js 
+    // if (floatBitsToUint(positions_buff(0u).w) == 12u) {
+    //     fragColor = vec4(0.0, 1.0, 0.0, 1.0);
+    //     return; 
+    // }
+
     int i = 0;
     // Loop max 200 iterations or until transmittance is too low
     for (i = 0; i < 200 && transmittance > 0.05; i++) {
         vec4 cell_data = positions_buff(cell);
 
-        // Previously read from cell_data.w, now seperate buffer
         uint adj_from = (cell > 0u) ? floatBitsToUint(positions_buff(cell - 1u).w) : 0u;
-        // uint adj_from = (cell > 0u) ? (offset_buff(cell - 1u)) : 0u;
         
         uint adj_to = floatBitsToUint(cell_data.w);
-        // uint adj_to = (offset_buff(cell));
         
         vec4 attrs = attrs_buff(cell);
 
@@ -143,18 +153,37 @@ void main()
 
         uint faces = adj_to - adj_from;
 
+        if (adj_to > 10000000u && cell == 0u) {
+            fragColor = vec4(1.0, 0.0, 0.0, 1.0);
+            return;
+        }
+
+        if (faces > 10000000u) {
+            fragColor = vec4(1.0, 0.0, 1.0, 1.0);
+            return;
+        }
+
+        //if (faces == 12u) {
+        //    fragColor = vec4(0.0, 1.0, 1.0, 1.0);
+        //    return;
+        //}
+
+        // Output textures to test 
+        // fragColor = vec4(cell_data.rgb, 1.0);
+        // return;
+
         for (uint f = 0u; f < faces; f += CHUNK_SIZE) {
 
             for (uint a1 = 0u; a1 < CHUNK_SIZE; a1++) {
                 if (f + a1 < faces) {
                      diffs[int(a1)] = adjacency_diff_buffer(adj_from + f + a1).xyz;
                 } else {
-                     diffs[int(a1)] = vec3(0.0);
+                    // diffs[int(a1)] = vec3(0.0);
                 }
             }
             
             for (uint a2 = 0u; a2 < CHUNK_SIZE; a2++) {
-                vec3 diff = diffs[int(a2)]; // half3 in HLSL is just vec3 in highp GLSL
+                vec3 diff = diffs[int(a2)];
                 float denom = dot(diff, ray_direction);
                 vec3 mid = cell_data.xyz + diff * 0.5;
                 float t = dot(mid - ray_origin, diff) / denom;
@@ -177,6 +206,7 @@ void main()
         transmittance *= (1.0 - alpha);
 
         if (next_face == INVALID_FACE) {
+            fragColor = vec4(1.0, 1.0, 0.5, 1.0);
             break;
         }
 
@@ -219,12 +249,12 @@ void main()
         <canvas id="gl-canvas" width="960" height="540"></canvas>
         <label for="x-slider">
             X Pos:
-        <input type="range" id="x-slider" min="-100" max="100" value="-50" step="1" />
+        <input type="range" id="x-slider" min="-100" max="100" value="0" step="1" />
         </label>
         
         <label for="y-slider">
             Y Pos:
-            <input type="range" id="y-slider" min="-100" max="100" value="-50" step="1" />
+        <input type="range" id="y-slider" min="-100" max="100" value="0" step="1" />
         </label>
 
         <label for="z-slider">

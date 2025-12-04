@@ -147,13 +147,11 @@ function initWebGL()
     console.log(Math.ceil(adjData.length / BUF_W));
     console.log(Math.ceil((plyData.attributes.POSITION.value.length / 3) / BUF_W));
 
-    SHADER_UNIFORMS.positions_tex_TexelSize.set([1.0 / BUF_W, 1.0 / BUF_W]);
-    SHADER_UNIFORMS.adjacency_tex_TexelSize.set([1.0 / BUF_W, 1.0 / BUF_W]);
+    // SHADER_UNIFORMS.positions_tex_TexelSize.set([1.0 / BUF_W, 1.0 / BUF_W]);
+    // SHADER_UNIFORMS.adjacency_tex_TexelSize.set([1.0 / BUF_W, 1.0 / BUF_W]);
 
-    // PROBLEM: Setting the texel size to the appropriate height, as commented below, causes memory overflow issues in WebGL.
-    // Some sort of texture tiling system or storage is needed to fix.
-    // SHADER_UNIFORMS.positions_tex_TexelSize.set([1.0 / BUF_W, Math.ceil((plyData.attributes.POSITION.value.length / 3) / BUF_W)]);
-    // SHADER_UNIFORMS.adjacency_tex_TexelSize.set([1.0 / BUF_W, Math.ceil(adjData.length / BUF_W)]);
+    SHADER_UNIFORMS.positions_tex_TexelSize.set([1.0 / BUF_W, 1.0 / (Math.ceil((plyData.attributes.POSITION.value.length / 3) / BUF_W))]);
+    SHADER_UNIFORMS.adjacency_tex_TexelSize.set([1.0 / BUF_W, 1.0 / (Math.ceil(adjData.length / BUF_W))]);
 }
 
 // Bind frag/vert shaders in index.html to webgl program and set uniforms
@@ -213,10 +211,10 @@ function initScene()
     gl.bufferData(gl.ARRAY_BUFFER, quadUVs, gl.STATIC_DRAW);
     
     gl.getExtension('EXT_color_buffer_float');
-    
+
     // Textures made from PLY data needed by shaders
     textureHandles = createVolumeTextures(gl, plyData, adjData);
-  
+
 }
 
 function findClosestPointIndex(x, y, z, positions)
@@ -263,7 +261,9 @@ function setUniforms(gl, program)
 
     gl.uniform1f(uniformLocations.FisheyeFOV, SHADER_UNIFORMS.FisheyeFOV);
     // gl.uniform1ui(uniformLocations.start_index, SHADER_UNIFORMS.start_index);
-    gl.uniform1ui(uniformLocations._start_index, findClosestPointIndex(0, 0, -50, plyData.attributes.POSITION.value));
+    gl.uniform1ui(uniformLocations._start_index, 
+        findClosestPointIndex(camera.x, camera.y, camera.z, plyData.attributes.POSITION.value)
+    );
     gl.uniform4fv(uniformLocations.ScreenParams, SHADER_UNIFORMS.ScreenParams);
     gl.uniform2fv(uniformLocations.positions_tex_TexelSize, SHADER_UNIFORMS.positions_tex_TexelSize);
     gl.uniform2fv(uniformLocations.adjacency_tex_TexelSize, SHADER_UNIFORMS.adjacency_tex_TexelSize);

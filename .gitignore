@@ -80,7 +80,9 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
-dist
+dist/*
+!dist/index.html
+!dist/webgl-utils.js.html
 
 # Gatsby files
 .cache/
